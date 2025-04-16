@@ -1,0 +1,181 @@
+[
+	{
+		"title" : "BC Wildfire Fire Locations - Current",
+		"name" : "bc-wildfire-fire-locations-current",
+		"bcdc_data_resource_url" : "https://catalogue.data.gov.bc.ca/dataset/2790e3f7-6395-4230-8545-04efb5a18800",
+		"description" : "Wildfire location points for the current fire season.  This includes both active and inactive fires. Data is supplied through various sources and is updated from the operational systems every 15 minutes.     These points are rolled over to Historical Fire Points on April 1 of each year.\n\nWildfire data may not reflect the most current fire situation, and therefore should only be used for reference purposes. Wildfire data is refreshed when practicable and individual fire update frequency will vary. The information is intended for general purposes only and should not be relied on as accurate because fires are dynamic and circumstances may change quickly.",
+		"purpose" : "This data can be used for visual or analytical purposes.",
+		"bcdc_type" : "Geographic",
+		"last_modified" : "2024-11-05T16:25:27",
+		"resource_storage_location" : "Bc Geographic Warehouse",
+		"object_name" : "WHSE_LAND_AND_NATURAL_RESOURCE.PROT_CURRENT_FIRE_PNTS_SP",
+		"object_short_name" : "C_FIRE_PNT",
+		"object_table_comments" : "Contains coordinate locations of current/active fire incidents. The data contains the spatial representation of the location coordinate point where the incident is occuring, zone information, and a geographic description.",
+		"projection_name" : "epsg3005",
+		"license_title" : "Open Government Licence - British Columbia",
+		"license_url" : "https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61",
+		"details" : [
+			{
+				"data_precision" : 25,
+				"column_comments" : "A composite of the following fields: Zone, Fire ID and Fire Centre.",
+				"short_name" : "FIRE_NO",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_NUMBER"
+			},
+			{
+				"data_precision" : 4,
+				"column_comments" : "Represents the fiscal year, April 1 to March 31.",
+				"short_name" : "FIRE_YEAR",
+				"data_type" : "NUMBER",
+				"column_name" : "FIRE_YEAR"
+			},
+			{
+				"data_precision" : 200,
+				"column_comments" : "Describes the type of response an incident is receiving and is based on fire behaviour, potential risks and environmental factors.",
+				"short_name" : "RSPNS_TYPC",
+				"data_type" : "VARCHAR2",
+				"column_name" : "RESPONSE_TYPE_DESC"
+			},
+			{
+				"data_precision" : 7,
+				"column_comments" : "The discovery date of the fire.",
+				"short_name" : "IGN_DATE",
+				"data_type" : "DATE",
+				"column_name" : "IGNITION_DATE"
+			},
+			{
+				"data_precision" : 7,
+				"column_comments" : "The date the fire is deemed out.",
+				"short_name" : "FR_T_DTE",
+				"data_type" : "DATE",
+				"column_name" : "FIRE_OUT_DATE"
+			},
+			{
+				"data_precision" : 30,
+				"column_comments" : "The control stage of the fire as of the last update, e.g, Under Control, Out of Control, Being Held, Out.",
+				"short_name" : "FIRESTATUS",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_STATUS"
+			},
+			{
+				"data_precision" : 10,
+				"column_comments" : "The suspected cause of the fire, e.g., Lightning, Person.",
+				"short_name" : "FIRE_CAUSE",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_CAUSE"
+			},
+			{
+				"data_precision" : 10,
+				"column_comments" : "Represents the BC Wildfire Service Centre administrative area.",
+				"short_name" : "FIRE_CENTR",
+				"data_type" : "NUMBER",
+				"column_name" : "FIRE_CENTRE"
+			},
+			{
+				"data_precision" : 10,
+				"column_comments" : "A subset of the BC Wildfire Service Centre administrative area.",
+				"short_name" : "ZONE",
+				"data_type" : "NUMBER",
+				"column_name" : "ZONE"
+			},
+			{
+				"data_precision" : 10,
+				"column_comments" : "A unique number, system-generated, within a fire year and fire centre.",
+				"short_name" : "FIRE_ID",
+				"data_type" : "NUMBER",
+				"column_name" : "FIRE_ID"
+			},
+			{
+				"data_precision" : 200,
+				"column_comments" : "Defines the type of incident that occured, e.g., Fire of Note, New, Modified/Monitored, Full Response.",
+				"short_name" : "FIRE_TYPE",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_TYPE"
+			},
+			{
+				"data_precision" : 100,
+				"column_comments" : "The official name of the wildfire.",
+				"short_name" : "INCDNT_NM",
+				"data_type" : "VARCHAR2",
+				"column_name" : "INCIDENT_NAME"
+			},
+			{
+				"data_precision" : 2000,
+				"column_comments" : "A description of the approximate fire location: IC must note how far and in what direction the wildfire is in relation to a geographic reference. Note: for Railroad fires, actual railroad mileage is iuncluded as part of the geographic information, e.g., Sallus Creek, 172 mile-marker on railroad.",
+				"short_name" : "GEO_DESC",
+				"data_type" : "VARCHAR2",
+				"column_name" : "GEOGRAPHIC_DESCRIPTION"
+			},
+			{
+				"data_precision" : 11,
+				"column_comments" : "The geographic coordinate, in decimal degrees (dd.dddddd), of the location of the feature as measured from the equator, e.g., 55.323653.",
+				"short_name" : "LATITUDE",
+				"data_type" : "NUMBER",
+				"column_name" : "LATITUDE"
+			},
+			{
+				"data_precision" : 11,
+				"column_comments" : "The geographic coordinate, in decimal degrees (-ddd.dddddd), of the location of the feature as measured from the prime meridian, e.g., -123.093544. ",
+				"short_name" : "LONGITUDE",
+				"data_type" : "NUMBER",
+				"column_name" : "LONGITUDE"
+			},
+			{
+				"data_precision" : 9,
+				"column_comments" : "The estimated size of the area within the outside perimeter of the incident, in hectares.",
+				"short_name" : "SIZE_HA",
+				"data_type" : "NUMBER",
+				"column_name" : "CURRENT_SIZE"
+			},
+			{
+				"data_precision" : 255,
+				"column_comments" : "The unique link to the fire details page for this fire.",
+				"short_name" : "FIRE_URL",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_URL"
+			},
+			{
+				"data_precision" : 1,
+				"column_comments" : "Indicates that the fire is currently a fire of note. Allowable values are Y for yes and N for no.",
+				"short_name" : "FR_F_NT_ND",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FIRE_OF_NOTE_IND"
+			},
+			{
+				"data_precision" : 1,
+				"column_comments" : "Indicates that the fire was a fire of note at some point during the fire season. Allowable values are Y for yes and N for no.",
+				"short_name" : "WS_FR_F_ND",
+				"data_type" : "VARCHAR2",
+				"column_name" : "WAS_FIRE_OF_NOTE_IND"
+			},
+			{
+				"data_precision" : 10,
+				"column_comments" : "Contains an alphanumeric value based on the Canadian Council of Surveys and Mappingâ€™s (CCSM) system for classification of geographic features, e.g., AR82000110.",
+				"short_name" : "FCODE",
+				"data_type" : "VARCHAR2",
+				"column_name" : "FEATURE_CODE"
+			},
+			{
+				"data_precision" : 1,
+				"column_comments" : "The column used to reference the spatial coordinates defining the feature.",
+				"short_name" : "SHAPE",
+				"data_type" : "SDO_GEOMETRY",
+				"column_name" : "SHAPE"
+			},
+			{
+				"data_precision" : "38",
+				"column_comments" : "A column required by spatial layers that interact with ESRI ArcSDE. It is populated with unique values automatically by SDE.",
+				"short_name" : "OBJECTID",
+				"data_type" : "NUMBER",
+				"column_name" : "OBJECTID"
+			},
+			{
+				"data_precision" : 4000,
+				"column_comments" : "A binary column used by spatial tools to store annotation, curve features and CAD data when using the SDO_GEOMETRY storage data type.",
+				"short_name" : null,
+				"data_type" : "BLOB",
+				"column_name" : "SE_ANNO_CAD_DATA"
+			}
+		]
+	}
+]

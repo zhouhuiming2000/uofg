@@ -1,0 +1,456 @@
+---
+title: "DATA*6200 Assignment 1"
+author: "Dr. Justin Slater"
+format: html
+---
+
+# Introduction
+
+This assignment is meant to reinforce and assess the following skills:
+
+-   Basic and intermediate data wrangling skills in R, including
+    -   Mutating, filtering, summarizing
+    -   Dealing with a variety of variable types
+    -   Applications of regular expressions
+-   Data cleaning
+-   Data visualization in `ggplot`
+-   Critical thinking skills
+
+# Your task
+
+Since the beginning of the Covid-19 pandemic, the workforce has undergone rapid changes, with some industries being more affected than others. In this assignment, you will analyze salaries by industry/jobs, and investigate trends in these industries/jobs over time. You will be using the `ask_a_manager.xlsx` data set provided on Courselink (from [here](https://www.askamanager.org/)). This data set was created using a form with several columns being "free text", and are hence messy. Feel free to do some research on these data.
+
+Throughout your analysis of these data, you should aim to answer the following questions:
+
+1.  Which industry or industries have the highest/lowest salaries?
+2.  Which industries have the highest salary variability?
+3.  How do salaries vary over time and geography?
+
+You should also offer insights as to why you observe what you observe, mentioning limitations with the data when relevant.
+
+# Instructions
+
+Your assignment should consist of two sections. The first section should be used to document important data cleaning steps and their justifications. This should be a combination of:
+
+-   Annotated code that is clear, concise, and demonstrates techniques we learned in class.
+-   Written justification of why certain data-related decisions were made, when applicable.
+
+The second section should have **up to five** data visualizations, alongside written descriptions of each. Describe how your visualizations help you answer the above questions, but also discuss their limitations. Format this section like a short essay, using your visualizations to reinforce your arguments.
+
+## Submission
+
+You should complete your assignment using Quarto or Rmarkdown. You should submit a code file and html/pdf with your report. The TA should be able to reproduce your report with minimal effort.
+
+## Tips
+
+-   There are a myriad of ways you could approach this assignment, just because your friend is doing it one way, doesn't mean you should. Me and my TA respect originality.
+-   Be concise and specific. Concise code and descriptions are your best friend. Please do not submit ChatGPT "valuable insights" paragraphs that could apply to any analysis. When discussing data limitations, try to offer specific limitations about **these data**, not limitations that could be said about any data. E.g rather than say "there are missing values", you may discuss **how** missingness impacts your ability to answer one of the questions, and what the impact may be.
+-   Use methods shown in class wherever possible.
+-   Take pride in your final report's format. In consulting, there is a saying: "If it looks right, it is right". Although I don't really believe this, a well formatted report builds trust in the reader.
+-   Use descriptive figure captions.
+
+# Data Import and Cleaning
+
+Package loading
+
+```{r,results = "hide",warning=FALSE}
+
+library(scales)
+library(quantmod)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+
+```
+
+Import data and rename the columns
+
+```{r, warning=FALSE}
+manager = read_excel('/Users/vanris/Documents/UG -DATA6200/ask_a_manager.xlsx',col_names = FALSE,skip = 1)
+colnames(manager) = c('time', 'age', 'industry','job', 'job_more', 'annual_salary', 'compensation', 'currency', 'other', 'income_more', 'country', 'us_province', 'city', 'working_years_all', 'working_years_current','education','gender','race')
+```
+
+
+
+My process would be group all data by industries, then take the average of income in each group and order them to find the lowest and highest salaries.
+
+First, take the relative columns we want, which includes 'industry', 'job', 'job_more', 'annual_salary', 'compensation', 'currency', 'other', 'income_more'
+
+```{r, warning=FALSE}
+industry_salary =  manager %>% 
+  select(industry, job, job_more, annual_salary, compensation, currency, other, income_more, working_years_all, working_years_current, age, country, city, us_province)
+```
+
+Next, check the total types of industries and make it easier to read.And , by unique , I find out that there's 1132 different response,so i will use regex to mutate them.Also, i deal with the NaNs first.
+
+```{r, warning=FALSE}
+  industry_nans = industry_salary %>% 
+  filter(is.na(industry))
+```
+
+There's 74 NAs in the industry line and as this is only a few amount, i will simply remove them from the whole dataset.
+
+```{r, warning=FALSE}
+  industry_salary = industry_salary %>% 
+  filter(!is.na(industry))
+```
+
+Then mutate the industry columns to classify all responses. i give 10 specific industries and put the left to 'other'.The 10 industries are : education, food, entertainment, technology, environment,service,health,commerce,government,energy and other.
+
+```{r, warning=FALSE}
+industry_salary = industry_salary %>%
+  mutate(industry = case_when(
+    grepl('Edu|teach|libra|museum|student|litera|learn|acade|school|archive|culture|textbook|study|phd', industry, ignore.case = TRUE) ~ "education",
+    grepl('food|beverage|wine', industry, ignore.case = TRUE) ~ "food",
+    grepl('music|video|game|animation|zoo|sports|film|theater|gym|fitness|entertainment|media', industry, ignore.case = TRUE) ~ "entertainment",
+    grepl('tech|science|software|internet|chemical|games|analytic|security|research|virtual|manuf', industry, ignore.case = TRUE) ~ "technology",
+    grepl('envir|ecology', industry, ignore.case = TRUE) ~ "environment",
+    grepl('consult|communi|call|service|restaurant|cleaning', industry, ignore.case = TRUE) ~ "service",
+    grepl('biology|pharm|medic|health|clinic|care|vet|pet|animal|hospital|frug',industry, ignore.case = TRUE) ~ "health",
+    grepl('commerce|retail|e-comm|finance|business|market|estate|trade|sale|goods|invest|econo', industry, ignore.case = TRUE) ~ "commerce",
+    grepl('soldier|gover|military|politic|law', industry, ignore.case = TRUE) ~ "government",
+    grepl('energy|oil|gas|resource', industry, ignore.case = TRUE) ~ "energy",
+    TRUE ~ 'other'
+  ))
+```
+
+Do the same process to check NAs in column annual_salary
+
+```{r, warning=FALSE}
+  salaries_nans = industry_salary %>% 
+  filter(is.na(annual_salary))
+```
+
+As there's no NAs in annual_salary, add compensation to the annual salary to get the total income of a year. For missing. values in compensation, just treat it as 0.
+
+```{r, warning=FALSE}
+industry_salary = industry_salary %>% 
+  mutate(
+    compensation = case_when(
+      is.na(compensation) ~ "0",
+      TRUE ~ compensation
+    )
+  )%>% 
+  mutate(
+    income_total = annual_salary + as.numeric(compensation)
+  )
+```
+
+Then i can deal with the currency now. First make sure all rows have a currency, and convert into USD.For those NA currency, i will simply remove them.
+
+```{r, warning=FALSE}
+
+industry_salary = industry_salary %>% 
+  filter(!is.na(currency)) %>% 
+  mutate(
+    currency = case_when(
+      grepl('other', currency, ignore.case = TRUE) ~ other,
+      TRUE ~ currency
+    )
+  ) %>% 
+  mutate(
+    currency = case_when(
+      grepl('aud|australian', currency, ignore.case = TRUE) ~ 'AUD',
+      grepl('Argent', currency, ignore.case = TRUE) ~ 'ARS',
+      grepl('indian', currency, ignore.case = TRUE) ~ 'INR',
+      grepl('brl|BR', currency, ignore.case = FALSE) ~ 'BRL',
+      grepl('mexican', currency, ignore.case = TRUE) ~ 'MXN',
+      grepl('american|US', currency, ignore.case = TRUE) ~ 'USD',
+      grepl('RMB', currency, ignore.case = TRUE) ~ 'CNY',
+      grepl('nis|ils|israeli', currency, ignore.case = TRUE) ~ 'ILS',
+      grepl('euro', currency, ignore.case = TRUE) ~ 'EUR',
+      grepl('THai', currency, ignore.case = TRUE) ~ 'THB',
+      grepl('singapore|sgd', currency, ignore.case = TRUE) ~ 'SGD',
+      grepl('dkk', currency, ignore.case = TRUE) ~ 'DKK',
+      grepl('php|philippine', currency, ignore.case = TRUE) ~ 'PHP',
+      grepl('bdt', currency, ignore.case = TRUE) ~ 'BDT',
+      grepl('pln|polish', currency, ignore.case = TRUE) ~ 'PLN',
+      grepl('taiwan|NTD', currency, ignore.case = TRUE) ~ 'TWD',
+      grepl('NOK', currency, ignore.case = TRUE) ~ 'NOK',
+      grepl('KRW|korean', currency, ignore.case = TRUE) ~ 'KRW',
+      grepl('czech', currency, ignore.case = TRUE) ~ 'CZK',
+      grepl('RM', currency, ignore.case = TRUE) ~ 'MYR',
+      grepl('croatian', currency, ignore.case = TRUE) ~ 'HRK',
+      grepl('czk', currency, ignore.case = TRUE) ~ 'CZK',
+      TRUE ~ currency
+    ) 
+  )%>% 
+    filter(!grepl("Rupees|Equity", currency))
+
+
+```
+
+Then use quantmod to fix the currency rate by creating a currency table.And compute the final salary in USD.And i will treat those whose salaries \> 1,500,000 as outliers.
+
+```{r, warning=FALSE}
+
+unicurrency = unique(industry_salary$currency)
+to_usd = rep('USD',length(unicurrency))
+rate = getQuote(paste0(unicurrency,to_usd,'=X'))
+currency_table = data_frame(currency = unicurrency, Rate = rate$Last)
+
+salaries_industry = left_join(industry_salary,currency_table,by = "currency")
+
+salaries_industry = salaries_industry %>% 
+  mutate(
+    final_pay = income_total * Rate
+  ) %>% 
+  filter(final_pay <= 1500000)
+  
+```
+
+# Q1:Which industry or industries have the highest/lowest salaries?
+Now, group by industries, and compute the average income
+
+```{r, warning=FALSE}
+avg_salary = salaries_industry %>%
+  group_by(industry) %>%
+  summarize(mean(final_pay))
+
+ggplot(avg_salary, aes(x = avg_salary$industry, y = avg_salary$`mean(final_pay)`, fill = industry)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Salary by Industry --lead by Technology",
+       x = "Industry",
+       y = "Average Salary(USD)")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+Through the plots, we can easily tell that Technology is having the highest average salary.
+
+# Q2:Which industries have the highest salary variability?
+
+I can show this through terms of standard deviation to represent the variability :
+
+```{r, warning=FALSE}
+variaty_salary = salaries_industry %>%
+  group_by(industry) %>%
+  summarize(sd(final_pay))
+
+ggplot(variaty_salary, aes(x = variaty_salary$industry, y = variaty_salary$`sd(final_pay)`, fill = industry)) +
+  geom_bar(stat = "identity") +
+  labs(title = " Salary Variaty by Industry --lead by Technology",
+       x = "Industry",
+       y = "Salary Variaty (USD)",
+       fill = "Working years in current Industry") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+
+```
+
+As the Graph shows, energy is the industry with the highest variability
+
+# Q3:How do salaries vary over time and geography?
+
+## By All Time
+
+First check the data of age.AS there is no existing NAs, group the data by working_years_all and compute the average income.
+
+```{r, warning=FALSE}
+avg_income_all_time = salaries_industry %>%
+  group_by(working_years_all) %>%
+  summarize(mean(final_pay))
+
+levels = c("1 year or less", "2 - 4 years", "5-7 years", "8 - 10 years", "11 - 20 years",  "21 - 30 years", "31 - 40 years", "41 years or more")
+
+avg_income_all_time$working_years_all = factor(avg_income_all_time$working_years_all, levels = levels)
+
+
+ggplot(avg_income_all_time , aes(x = avg_income_all_time$working_years_all , y = avg_income_all_time$`mean(final_pay)`, fill = working_years_all)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Salary Increasing with Time ",
+       x = "Total Working Time",
+       y = "Average Salary(USD)",
+       fill = "Working Years Total")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+From the graph, i can conclude that, before 31 years of experience, the payment is having positive relationship with working experience, while after 31 years, the average income starts to go down, but still higher than those workers with less than 10 years experience, And there's a huge increasement between 8-10 years and 11-20 years.
+
+## By Specific Time
+
+This time, try find the relation between average income and working time in the current industry
+
+```{r, warning=FALSE}
+avg_income_current_time = salaries_industry %>%
+  group_by(working_years_current) %>%
+  summarize(mean(final_pay))
+
+levels = c("1 year or less", "2 - 4 years", "5-7 years", "8 - 10 years", "11 - 20 years",  "21 - 30 years", "31 - 40 years", "41 years or more")
+
+avg_income_current_time$working_years_current = factor(avg_income_current_time$working_years_current, levels = levels)
+
+
+ggplot(avg_income_current_time , aes(x = working_years_current , y = `mean(final_pay)`, fill = working_years_current)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Salary Increasing with Time ",
+       x = "Total Working Time in current industry",
+       y = "Average Salary(USD)",
+       fill = "Working years in current Industry")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+This is looking similar as the total working time , the peak appears at 21-30 years of working experience and fall down after. And before 31 years of working, the salary increase with time.
+
+## By Age
+
+I will do the same procedure with age to check if it's the same pattern.
+
+```{r, warning=FALSE}
+avg_income_age = salaries_industry %>%
+  group_by(age) %>%
+  summarize(mean(final_pay))
+
+levels = c("under 18", "18-24", "25-34", "35-44", "45-54", "55-64", "65 or over")
+
+avg_income_age$age = factor(avg_income_age$age, levels = levels)
+
+
+ggplot(avg_income_age, aes(x = age, y = `mean(final_pay)`, fill = age)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Salary Increasing with Age ",
+       x = "Age",
+       y = "Average Salary(USD)",
+       fill = "Age")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+Now the highest average salary is still those with approxiamtely 30 years working experience, and wierd to find that the lowest falls inn 18-24, but not those who are under 18,and people are getting increasing salary along with time before 54.
+
+## By Country
+
+First , i will do salaries against countries, and as there's so many countries, i will only pick USA, CAN, UK, CHN for comparison.
+
+```{r, warning=FALSE}
+  
+  country_salary = salaries_industry %>% 
+    mutate(
+      country = case_when(
+      grepl('USA|United S|America|US|U.S.|U. S.|uniited states|states', country, ignore.case = TRUE) ~ 'USA',
+      grepl('UK|United K|Britain|U.K.|England', country, ignore.case = TRUE) ~ 'UK',
+      grepl('CAN|Canada|Csnada', country, ignore.case = TRUE) ~ 'CAN',
+      grepl('TAIWAN|HONG KONG|CHN|China|hong konh', country, ignore.case = TRUE) ~ 'CHN',
+      TRUE ~ 'Other'
+      )
+    )
+
+  avg_income_country = country_salary %>%
+  group_by(country) %>%
+  summarize(mean(final_pay))
+  
+  ggplot(avg_income_country, aes(x = country, y = `mean(final_pay)`, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Salary in different Country ",
+       x = "Country",
+       y = "Average Salary(USD)",
+       fill = "Country")+
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+Its obvious that USA is leading the the average salary, but it may caused by the insufficient data of other countries, So i would like to step further to USA, to compare the salaries between different states. And i will pick the first appeared states.
+
+## By States
+
+```{r, warning=FALSE}
+
+state_salary = salaries_industry %>% 
+    mutate(
+      us_province = case_when(
+        grepl('Alabama',us_province,ignore.case = TRUE)~'Alabama',
+        grepl('Alaska',us_province,ignore.case = TRUE)~'Alaska',
+        grepl('Arizona',us_province,ignore.case = TRUE)~'Arizona',
+        grepl('Arkansas',us_province,ignore.case = TRUE)~'Arkansas',
+        grepl('California',us_province,ignore.case = TRUE)~'California',
+        grepl('Colorado',us_province,ignore.case = TRUE)~'Colorado',
+        grepl('Connecticut',us_province,ignore.case = TRUE)~'Connecticut',
+        grepl('Delaware',us_province,ignore.case = TRUE)~'Delaware',
+        grepl('Florida',us_province,ignore.case = TRUE)~'Florida',
+        grepl('Georgia',us_province,ignore.case = TRUE)~'Georgia',
+        grepl('Hawaii',us_province,ignore.case = TRUE)~'Hawaii',
+        grepl('Idaho',us_province,ignore.case = TRUE)~'Idaho',
+        grepl('Illinois',us_province,ignore.case = TRUE)~'Illinois',
+        grepl('Indiana',us_province,ignore.case = TRUE)~'Indiana',
+        grepl('Iowa',us_province,ignore.case = TRUE)~'Iowa',
+        grepl('Kansas',us_province,ignore.case = TRUE)~'Kansas',
+        grepl('Kentucky',us_province,ignore.case = TRUE)~'Kentucky',
+        grepl('Louisiana',us_province,ignore.case = TRUE)~'Louisiana',
+        grepl('Maine',us_province,ignore.case = TRUE)~'Maine',
+        grepl('Maryland',us_province,ignore.case = TRUE)~'Maryland',
+        grepl('Massachusetts',us_province,ignore.case = TRUE)~'Massachusetts',
+        grepl('Michigan',us_province,ignore.case = TRUE)~'Michigan',
+        grepl('Minnesota',us_province,ignore.case = TRUE)~'Minnesota',
+        grepl('Mississippi',us_province,ignore.case = TRUE)~'Mississippi',
+        grepl('Missouri',us_province,ignore.case = TRUE)~'Missouri',
+        grepl('Montana',us_province,ignore.case = TRUE)~'Montana',
+        grepl('Nebraska',us_province,ignore.case = TRUE)~'Nebraska',
+        grepl('Nevada',us_province,ignore.case = TRUE)~'Nevada',
+        grepl('New Hampshire',us_province,ignore.case = TRUE)~'New Hampshire',
+        grepl('New Jersey',us_province,ignore.case = TRUE)~'New Jersey',
+        grepl('New Mexico',us_province,ignore.case = TRUE)~'New Mexico',
+        grepl('New York',us_province,ignore.case = TRUE)~'New York',
+        grepl('North Carolina',us_province,ignore.case = TRUE)~'North Carolina',
+        grepl('North Dakota',us_province,ignore.case = TRUE)~'North Dakota',
+        grepl('Ohio',us_province,ignore.case = TRUE)~'Ohio',
+        grepl('Oklahoma',us_province,ignore.case = TRUE)~'Oklahoma',
+        grepl('Oregon',us_province,ignore.case = TRUE)~'Oregon',
+        grepl('Pennsylvania',us_province,ignore.case = TRUE)~'Pennsylvania',
+        grepl('Rhode Island',us_province,ignore.case = TRUE)~'Rhode Island',
+        grepl('South Carolina',us_province,ignore.case = TRUE)~'South Carolina',
+        grepl('South Dakota',us_province,ignore.case = TRUE)~'South Dakota',
+        grepl('Tennessee',us_province,ignore.case = TRUE)~'Tennessee',
+        grepl('Texas',us_province,ignore.case = TRUE)~'Texas',
+        grepl('Utah',us_province,ignore.case = TRUE)~'Utah',
+        grepl('Vermont',us_province,ignore.case = TRUE)~'Vermont',
+        grepl('Virginia',us_province,ignore.case = TRUE)~'Virginia',
+        grepl('Washington|Columbia',us_province,ignore.case = TRUE)~'Washington',
+        grepl('West Virginia',us_province,ignore.case = TRUE)~'West Virginia',
+        grepl('Wisconsin',us_province,ignore.case = TRUE)~'Wisconsin',
+        grepl('Wyoming',us_province,ignore.case = TRUE)~'Wyoming',
+        TRUE ~ 'Not US'
+        )
+      )
+
+avg_income_state = state_salary %>%
+  group_by(us_province) %>%
+  summarize(mean(final_pay))
+
+sorted_indices <- order(avg_income_state$`mean(final_pay)`)
+lowest_indices <- sorted_indices[1:3]
+highest_indices <- sorted_indices[(length(sorted_indices)-2):length(sorted_indices)]
+label_indices <- c(lowest_indices, highest_indices)
+x_labels <- rep("", length(avg_income_state$us_province))
+x_labels[label_indices] <- avg_income_state$us_province[label_indices]
+avg_value <- mean(avg_income_state$`mean(final_pay)`)
+avg_value
+  
+  ggplot(avg_income_state, aes(x = us_province, y = `mean(final_pay)`)) +
+  geom_point(color = "red", size = 3) +
+  geom_hline(yintercept = avg_value, linetype = "dashed", color = "green", size = 1) +
+  labs(title = "Average Salary in different States ",
+       x = "States",
+       y = "Average Salary(USD)",
+       ) +
+   theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "italic")
+  ) +
+  scale_y_continuous(labels = comma) +
+  scale_x_discrete(breaks = avg_income_state$us_province, labels = x_labels)  
+```
+
+Now i can tell from the graph that the highest 3 salaries are California, Washington and New York which are Metropolitan cities, while, Wyoming, Montana and North Dakota are the lowest 3 salaries in US.Also, the average salary is 84472.

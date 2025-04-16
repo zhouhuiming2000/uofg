@@ -1,0 +1,421 @@
+---
+title: "DATA*6200 Assignment 2"
+author: "Dr. Justin Slater"
+format: html
+---
+
+# Learning Objectives
+
+This assignment is meant to reinforce and assess the following skills:
+
+- Intermediate data wrangling skills in R, including
+    - Basic webscraping
+    - Geospatial data wrangling
+- Telling stories with data
+- Visualizing data over space and time
+- Critical thinking skills
+
+# Your task
+
+Wildfires are a growing concern in Canada, particularly in British Columbia (B.C). Resultingly, the B.C government has records of all substantial fires [historically (2012-2017)](https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/wildfire-statistics), and [currently](https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/disclaimer).
+
+In this assignment, I want you to analyze the wildfire distribution in B.C over time from 2012-2017, and compare this to the current data. I also want you to determine what climate and environmental factors increase impact fire likelihood.
+
+To do this, take the following steps:
+
+1. Scrape the 2012-2017 data using methods we used in class.
+2. Pull temperature and elevation data for B.C using the `geodata` package. Crop and mask as needed.
+3. Visualize wildfires over time between 2012-2017 overtop a temperature raster.
+4. Use a maximum of two visualizations to answer the question: how do temperature/elevation impact fire occurence?
+5. How does the historical distribution (2012-2017) of wildfires differ from this year's (2024) wildfires?
+
+Your visualizations should be standalone, but complete answers to the questions will also involve written descriptions. These written descriptions should include a discussion of data/analysis limitations.
+
+# Submission
+
+You should submit a .rmd/.qmd file (not a presentation) that contains all code used to wrangle the data and produce visualizations. You should knit/compile to an html file, which should contain visualizations, key code chunks, and brief written descriptions of your answers.
+
+You can organize your document into sections corresponding to the question numbers, or in any other reasonable way.
+
+## Tips
+
+- Be concise and specific. Concise code and descriptions are your best friend. Please do not submit ChatGPT "valuable insights" paragraphs that could apply to any analysis. When discussing data limitations, try to offer specific limitations about **these data**, not limitations that could be said about any data. E.g rather than say "there are missing values", you may discuss **how** missingness impacts your ability to answer one of the questions, and what the impact may be.
+- Use methods shown in class wherever possible. 
+- Take pride in your final report's format.
+- Use descriptive figure captions for complex visualizations.
+
+# Grading Scheme [45 marks total]
+
+The following rubric depicts the grade breakdown for this assignment, followed by statements that are consistent with certain grade levels. Please note that a more detailed rubric will be used for grading. However, we do not provide you with a more detailed rubric at this stage, because this would give too many clues on how the assignment should be done. Also note that although these statements are guidelines for what a strong assignment submission looks like, the final grade is ultimately made at the discretion of the instructor/TA.
+
+### Code quality [10 points]
+
+*Note: It is your job to know what good coding practices are based on the lectures/readings.*
+
+- [9-10] Code is clear and concise, and lacks unnecessary repetition. Code clearly demonstrates the techniques learned in class, and follows good programming practices. The code is well documented and easy to follow. 
+- [7-8] Code is mostly clear and concise, but tends to over-rely on one or two techniques. The code is mostly well documented, but some comments are missing. "Over-commenting" may be present.
+- [5-6] Code "gets the job done" but is very hard to follow or includes unnecessary chunks. Methods from outside the class are implemented with no explanation or description.
+- [<5] inadequate
+
+### Data Processing Decisions [10 marks]
+
+- [9-10] Data cleaning and processing decisions are well-justified in context of research question(s). The student made extra effort to get the most out of the data at hand. Data is formatted according to principles discussed in class.
+- [7-8] Most data cleaning/processing decisions are justified, with some processing decisions potentially being misguided. Data is formatted according to principles discussed in class, with 1 or 2 noticeable inaccuracies.
+- [5-6] Data cleaning/processing decisions are not well justified. Many observations are binned or discarded without much thought. Data is not well formatted after processing.
+- [<5] Inadequate
+
+## Data visualizations and descriptions [20 marks]
+
+- [18-20] Visualizations are attractive, well captioned and mostly convey their point on their own. Good graphing principles are followed in all visualizations, applying advanced ggplot features when necessary. Arguments and descriptions accompanying each figure are clear and concise, are specific to the problem at hand, and help convey the student's point. Figure captions are well utilized. Limitation of the data/analysis are clearly described in the context of the questions.
+- [14-17] Visualizations are mostly attractive, with minor unclear elements. Good graphing principles are mostly followed in some visualizations, but not in others. Arguments and descriptions accompanying the figures are mostly clear and concise, but may be more vague than necessary. Figure Captions are utilized, but may not tell the whole story. Limitation of the data/analysis are described mostly in the context of the questions.
+- [10-13] Visualizations lack clarity in key areas, and are hard to interpret without additional explanation. Arguments and descriptions accompanying the visualizations are vague or are irrelevant to answering the research questions(s). Captions are not used or are misapplied. Limitation of the data/analysis are vague and not specific to the questions posed.
+- [<10] Inadequate
+
+## Formatting and Reproducibility [5 marks]
+
+- [5] The analysis was reproducible with minimal effort. Results from the reproduced file match those from the submitted file. The document is easy to follow and is professionally presented.
+- [3-4] The analysis required substantial effort to reproduce. There are minor discrepancies between the submitted file and reproduced file. The document is mostly well-presented.
+- [0-2] Analysis was not reproducible or required consultation with the student to reproduce it. The document is not easy to follow and is not visually attractive.
+
+# Scraping Data
+
+```{r, warning=FALSE}
+library(httr)
+library(xml2)
+library(rvest)
+library(geodata)
+library(tidyverse)
+library(sf) 
+library(osmdata) 
+library(spData)
+library(ggplot2)
+library(dplyr)
+library(tmap)
+library(terra)
+```
+
+```{r, warning=FALSE}
+wildfire_html = read_html('https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/wildfire-statistics')
+```
+
+```{r, warning=FALSE}
+wildfire_html
+wildfire = wildfire_html %>% 
+  html_element("table") %>% 
+  html_table()
+wildfire
+```
+
+
+```{r, warning=FALSE}
+unique(wildfire$Year)
+```
+
+# fix the wildfire data
+
+I will first seperate the data into monthly distributed from january to december
+
+```{r, warning=FALSE}
+wildfire_time = wildfire %>% 
+  mutate(month = case_when(
+    grepl('january', `Discovery Date`, ignore.case = TRUE) ~ 1,
+    grepl('february', `Discovery Date`, ignore.case = TRUE) ~ 2,
+    grepl('march', `Discovery Date`, ignore.case = TRUE) ~ 3,
+    grepl('april', `Discovery Date`, ignore.case = TRUE) ~ 4,
+    grepl('may', `Discovery Date`, ignore.case = TRUE) ~ 5,
+    grepl('june', `Discovery Date`, ignore.case = TRUE) ~ 6,
+    grepl('july', `Discovery Date`, ignore.case = TRUE) ~ 7,
+    grepl('august', `Discovery Date`, ignore.case = TRUE) ~ 8,
+    grepl('september', `Discovery Date`, ignore.case = TRUE) ~ 9,
+    grepl('october', `Discovery Date`, ignore.case = TRUE) ~ 10,
+    grepl('november', `Discovery Date`, ignore.case = TRUE) ~ 11,
+    grepl('december', `Discovery Date`, ignore.case = TRUE) ~ 12,
+    TRUE ~ 0
+    )
+  )
+
+wildfire_time
+```
+
+Now, deal with longitude and latitude, as this type of coordinates is not what i want, i have to do the transformation.
+```{r, warning=FALSE}
+convert_latitude = function(coord) {
+  matches = regexec("([0-9]+) ([0-9]+\\.?[0-9]*)", coord)
+  matched_strings = regmatches(coord, matches)
+  degrees = as.numeric(matched_strings[[1]][2])
+  minutes = as.numeric(matched_strings[[1]][3])
+  decimal = degrees + minutes / 60
+  return(decimal)
+}
+
+convert_longitude = function(coord) {
+  matches = regexec("([0-9]+) ([0-9]+\\.?[0-9]*)", coord)
+  matched_strings = regmatches(coord, matches)
+  degrees = as.numeric(matched_strings[[1]][2])
+  minutes = as.numeric(matched_strings[[1]][3])
+  decimal = degrees + minutes / 60
+  return(-decimal)
+}
+```
+
+Apply the function
+```{r, warning=FALSE}
+wildfire_coord = wildfire_time
+wildfire_coord$longitude = sapply(wildfire_time$Longitude, convert_longitude)
+wildfire_coord$latitude = sapply(wildfire_time$Latitude, convert_latitude)
+wildfire_coord
+```
+
+Now the coordinate and the time are transformed.
+
+# Pull elevation data
+
+This is how BC looks like.
+```{r, warning=FALSE}
+can = gadm('CAN',level = 1,path = tempdir())
+bc = can[can$NAME_1 == 'British Columbia']
+bc
+plot(bc, lwd = 1)
+```
+
+Elevation data
+```{r, warning=FALSE}
+can_ele = elevation_30s(country = 'CAN',path = tempdir())
+can_ele
+plot(can_ele)
+```
+
+# crop and mask elevation data
+
+```{r, warning=FALSE}
+bc_ele = crop(can_ele, bc)
+bc_ele = mask(bc_ele, bc)
+bc_ele
+plot(bc_ele)
+
+```
+
+
+now plot the dots on the plot, 
+
+```{r, warning=FALSE}
+wildfire_sf = st_as_sf(wildfire_coord, coords = c("longitude", "latitude"), crs = 4326)
+wildfire_sf = st_transform(wildfire_sf, st_crs(bc_ele))
+tm_bc_ele = tm_shape(bc_ele) + 
+  tm_raster(palette = terrain.colors(1000), title = "Elevation (m)", style = "cont")
+tm_bc_ele
+tm_bc_ele_sf = tm_bc_ele +
+  tm_shape(wildfire_sf) +
+  tm_dots(col = "red", size = 0.1, fill_alpha = 0.3)
+tm_bc_ele_sf
+
+```
+
+From this graph, we can tell that the wildfire gathers at the low elevation area,
+as high elevation area contains less oxygen than those low elevation area.
+Most fires appears lower than 1000m.
+
+
+
+
+#Pull temperature data
+Now coming to weather,pulling data first
+
+```{r, warning=FALSE}
+can_temp = worldclim_country('CAN',var = "tavg", path = tempdir())
+can_temp
+plot(can_temp)
+```
+#crop and mask temperature data
+```{r, warning=FALSE}
+bc_temp = crop(can_temp, bc)
+bc_temp = mask(bc_temp, bc)
+bc_temp
+plot(bc_temp)
+```
+
+# visualize the temperature data
+
+```{r, warning=FALSE}
+month = vector('list',length = 12)
+months = c('January','Febuary','March','April','May','June','July','August','September','October','November','December')
+for (i in 1:12) {
+  month[[i]] =
+  tm_shape(bc_temp[[i]]) + 
+    tm_raster(palette = terrain.colors(100), title= months[i], style = "cont")
+}
+
+month
+```
+
+plot dots on the graph
+```{r, warning=FALSE}
+wf_temp = vector('list',length =  12)
+for ( i in 1:12){
+  wildfire_month = wildfire_coord %>% 
+    filter(month == i)
+  if (nrow(wildfire_month) > 0){
+  wildfire_month = st_as_sf(wildfire_month, coords = c("longitude", "latitude"), crs = 4326)
+  wildfire_month = st_transform(wildfire_month, st_crs(bc_temp))
+  wf_temp[[i]] = month[[i]] +
+    tm_shape(wildfire_month) +
+    tm_dots(col = "red", size = 0.1, fill_alpha = 0.3)
+  }else{
+    wf_temp[[i]] =  month[[i]]
+  }
+}
+
+wf_temp
+```
+
+
+
+
+Now , from the graphs , we can easily tell that those wildfire only happen at the area with temperature greater than 0。
+
+
+
+#How does elevation and temperature correlated with wildfire
+
+```{r, warning=FALSE}
+wildfire_vect = vect(wildfire_sf)
+elevation_value = terra::extract(bc_ele, wildfire_vect)[,2]
+wildfire_elevation = wildfire_sf %>% 
+  mutate(elevation = elevation_value) 
+wildfire_elevation
+ggplot(wildfire_elevation, aes(x = elevation)) +
+  geom_histogram(binwidth = 100, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Elevation (m)", y = "Number of Wildfires", title = "Number of fires decrease after 700 m")
+```
+
+From the histogram, we can see that most fire happens at elevation from 500m - 1100m, and decrease as the elevation gets higher.
+Thus, there's a possibly negative correlation between wildfire and elevation.
+
+
+```{r, warning=FALSE}
+
+ggplot(wildfire_coord, aes(x = month)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Month", y = "Number of Wildfires", title = "Wildfire most appears summer")
+```
+
+From the graph we can tell that most fire happens during month7 and month8 and fire barely happens on month 11 - month2.
+So look further on the temperature.
+
+
+```{r, warning=FALSE}
+wildfire_degree = wildfire_sf %>%
+  mutate(degree = case_when(
+    month == 1 ~ terra::extract(bc_temp[[1]], vect(geometry))[, 2],  
+    month == 2 ~ terra::extract(bc_temp[[2]], vect(geometry))[, 2],  
+    month == 3 ~ terra::extract(bc_temp[[3]], vect(geometry))[, 2],  
+    month == 4 ~ terra::extract(bc_temp[[4]], vect(geometry))[, 2],  
+    month == 5 ~ terra::extract(bc_temp[[5]], vect(geometry))[, 2],  
+    month == 6 ~ terra::extract(bc_temp[[6]], vect(geometry))[, 2],  
+    month == 7 ~ terra::extract(bc_temp[[7]], vect(geometry))[, 2],  
+    month == 8 ~ terra::extract(bc_temp[[8]], vect(geometry))[, 2],  
+    month == 9 ~ terra::extract(bc_temp[[9]], vect(geometry))[, 2],  
+    month == 10 ~ terra::extract(bc_temp[[10]], vect(geometry))[, 2],  
+    month == 11 ~ terra::extract(bc_temp[[11]], vect(geometry))[, 2],  
+    month == 12 ~ terra::extract(bc_temp[[12]], vect(geometry))[, 2],  
+    TRUE ~ 100
+  ))
+
+
+wildfire_degree
+```
+
+
+```{r, warning=FALSE}
+ggplot(wildfire_degree, aes(x = degree)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Degree", y = "Number of Wildfires", title = "Relation between Wildfire and Temperature")
+```
+
+
+
+From the histogram, we can easily tell that the number of wildfire increase as the temperature increase till about 12.5 but then decrease as the temperature get higher.
+
+
+# This year's wildfire
+
+```{r, warning=FALSE}
+wildfire_2024 = read_csv('/Users/vanris/Documents/UG -DATA6200/ASS2/C_FIRE_PNT.csv')
+head(wildfire_2024)
+```
+
+Check the elevation first
+
+```{r, warning=FALSE}
+wildfire_2024_month = wildfire_2024 %>% 
+  mutate(month = as.numeric(substr(as.character(IGN_DATE),5,6)))
+
+wildfire_2024_month
+```
+
+```{r, warning=FALSE}
+wildfire_2024_sf = st_as_sf(wildfire_2024_month, coords = c('LONGITUDE','LATITUDE'), crs = 4326)
+wildfire_2024_sf
+```
+
+Now attach the corresponding elevation and temperature data.
+
+```{r, warning=FALSE}
+wildfire_2024_vect = vect(wildfire_2024_sf)
+elevation_value = terra::extract(bc_ele, wildfire_2024_vect)[,2]
+wildfire_2024_elevation = wildfire_2024_sf %>% 
+  mutate(elevation = elevation_value) 
+wildfire_2024_elevation
+
+ggplot(wildfire_2024_elevation, aes(x = elevation)) +
+  geom_histogram(binwidth = 100, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Elevation (m)", y = "Number of Wildfires", title = "Number of fires decrease after 1000 m")
+```
+
+
+
+
+The output looks mostly the same, but theres still differences exists.For 2024, fire happens around height 700m to 1500m,and peaks at 1000m while the history data centers 700m and have lower cases after 1100m.
+
+
+```{r, warning=FALSE}
+ggplot(wildfire_2024_sf, aes(x = month)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Month", y = "Number of Wildfires", title = "Wildfire most appears summer")
+```
+
+When looking at the month, it's not hard to tell that most wildfire appears in july and august, which is the hottest time in BC.
+
+```{r, warning=FALSE}
+wildfire_2024_degree = wildfire_2024_sf %>%
+  mutate(degree = case_when(
+    month == 1 ~ terra::extract(bc_temp[[1]], vect(geometry))[, 2],  
+    month == 2 ~ terra::extract(bc_temp[[2]], vect(geometry))[, 2],  
+    month == 3 ~ terra::extract(bc_temp[[3]], vect(geometry))[, 2],  
+    month == 4 ~ terra::extract(bc_temp[[4]], vect(geometry))[, 2],  
+    month == 5 ~ terra::extract(bc_temp[[5]], vect(geometry))[, 2],  
+    month == 6 ~ terra::extract(bc_temp[[6]], vect(geometry))[, 2],  
+    month == 7 ~ terra::extract(bc_temp[[7]], vect(geometry))[, 2],  
+    month == 8 ~ terra::extract(bc_temp[[8]], vect(geometry))[, 2],  
+    month == 9 ~ terra::extract(bc_temp[[9]], vect(geometry))[, 2],  
+    month == 10 ~ terra::extract(bc_temp[[10]], vect(geometry))[, 2],  
+    month == 11 ~ terra::extract(bc_temp[[11]], vect(geometry))[, 2],  
+    month == 12 ~ terra::extract(bc_temp[[12]], vect(geometry))[, 2],  
+    TRUE ~ 100
+  ))
+
+
+wildfire_2024_degree
+```
+
+
+```{r, warning=FALSE}
+ggplot(wildfire_2024_degree, aes(x = degree)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "white", alpha = 0.7) +
+  labs(x = "Degree", y = "Number of Wildfires", title = "Relation between Wildfire and Temperature")
+```
+
+From the graph, most fire are caused above 10 degrees, which is mostly the same pattern as the history data and also the peaks are 15 degree. And the numebr of wildfire decrease after 15.
+
+
+

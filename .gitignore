@@ -22,3 +22,6 @@ dataset/
 *.xlsx
 *.txt
 *.xls
+*.png
+*.jpeg
+*.heic

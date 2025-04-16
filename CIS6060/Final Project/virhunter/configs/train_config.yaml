@@ -1,0 +1,23 @@
+# 示例：病毒/宿主二分类配置
+predict:
+  test_ds: "../virhunter_data/test/viral_contigs.fasta"
+  weights: "../virhunter_data/models/"
+  out_path: "../virhunter_results/"
+  n_cpus: 8
+  return_viral: True
+  limit: 750  # 根据实际数据调整
+
+prepare_ds:
+  path_virus: "../virhunter_data/train/viruses/sequences.fasta"
+  path_plant: "../virhunter_data/train/host/sequences.fasta"
+  out_path: "../virhunter_data/prepared/"
+  n_cpus: 8
+  random_seed: 42
+
+train:
+  ds_path: "../virhunter_data/prepared/"
+  out_path: "../virhunter_data/models/"
+  epochs: 10    # 可增加轮次提升精度
+  n_cpus: 8
+  random_seed: 42
+

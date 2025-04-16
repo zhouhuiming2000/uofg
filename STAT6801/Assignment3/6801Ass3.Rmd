@@ -1,0 +1,193 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-11-17"
+warning: false
+---
+```{r}
+# install.packages('catdata')
+```
+
+```{r}
+library(catdata)
+library(dplyr)
+library(ggplot2)
+
+```
+
+```{r}
+data(aids)
+```
+
+```{r}
+unique_person = unique(aids$person)
+unique_person
+set.seed(666)
+randint = sample(unique_person,50)
+training_data = aids %>% 
+  filter(person %in% randint)
+training_data
+```
+
+
+
+```{r}
+bandwidths <- seq(15, 40, length.out = 100)
+
+```
+
+```{r}
+x = training_data$time
+y = training_data$cd4
+smoother = ksmooth(x,y, kernel = "normal", bandwidth = 2, x.points = unique(x))
+smoothed_values = smoother$y
+  smoothed_full = smoothed_values[match(x, unique(x))]
+  residuals = y - smoothed_full
+noise_variance = var(residuals)
+noise_variance
+```
+
+#b
+
+```{r}
+cp_values <- numeric(length(bandwidths))
+for (i in 1:length(bandwidths)) {
+  bandwidth <- bandwidths[i]
+  smoother = ksmooth(x,y, kernel = "normal", bandwidth = bandwidth, x.points = unique(x))
+  smoothed_values = smoother$y
+  smoothed_full = smoothed_values[match(x, unique(x))]
+  residuals = y - smoothed_full
+  rss = sum(residuals^2)
+  noise_variance = var(residuals)
+  n = length(x)
+  kernel_weights <- exp(-0.5 * (outer(x, x, "-") / bandwidth)^2)
+  smoother_matrix_diag <- diag(kernel_weights)
+  trace_S_lambda = sum(smoother_matrix_diag)
+  cp =  1/n * (rss + 2 * noise_variance * trace_S_lambda)
+  cp_values[i] <- cp
+}
+```
+
+```{r}
+cp_values
+```
+```{r}
+optimal_bandwidth_idx <- which.min(cp_values)
+optimal_bandwidth <- bandwidths[optimal_bandwidth_idx]
+smoother = ksmooth(x,y, kernel = "normal", bandwidth = optimal_bandwidth, x.points = unique(x))
+smoothed_values = smoother$y
+smoothed_full = smoothed_values[match(x, unique(x))]
+residuals = y - smoothed_full
+rss = sum(residuals^2)
+training_error = rss/length(x)
+training_error
+```
+
+```{r}
+
+
+cp_plot <- ggplot(data.frame(bandwidths, cp_values), aes(x = bandwidths, y = cp_values)) +
+  geom_line(color = "blue") +
+  geom_vline(xintercept = optimal_bandwidth, color = "red", linetype = "dashed") +
+  labs(title = "Cp Statistic vs. Bandwidth", x = "Bandwidth", y = "Cp Statistic") +
+  theme_minimal()
+
+print(cp_plot)
+
+```
+
+```{r}
+fitted_plot <- ggplot(data.frame(x, y), aes(x = x, y = y)) +
+  geom_point(color = "red", alpha = 0.5) +
+  geom_line(aes(x = x, y = smoothed_full), color = "blue", size = 1) +
+  labs(title = paste("Kernel Smoothing with Optimal Bandwidth =", round(optimal_bandwidth, 2)),
+       x = "Time since Seroconversion (Years)", y = "CD4 Count") +
+  theme_minimal()
+
+print(fitted_plot)
+```
+#c
+```{r}
+
+bootstrapped_loo <- function(x, y, bandwidth, n_bootstrap = 100) {
+  
+  n <- length(x)  
+  bootstrap_errors <- numeric(n_bootstrap)  
+  for (i in 1:n_bootstrap) {
+    bootstrap_indices <- sample(1:n, size = n, replace = TRUE)
+    x_bootstrap <- x[bootstrap_indices]
+    y_bootstrap <- y[bootstrap_indices]
+    loo_errors <- numeric(n)  
+    for (j in 1:n) {
+      x_train <- x_bootstrap[-j]
+      y_train <- y_bootstrap[-j]
+      smoother_train <- ksmooth(x_train, y_train, kernel = "normal", bandwidth = bandwidth, x.points = unique(x))
+      smoothed_train_values <- smoother_train$y
+      prediction <- smoothed_train_values[match(x[j], unique(x))]
+      loo_errors[j] <- (y[j] - prediction)^2
+    }
+    bootstrap_errors[i] <- mean(loo_errors)
+  }
+  mean_bootstrap_error <- mean(bootstrap_errors)
+  return(mean_bootstrap_error)
+}
+
+n_bootstrap <- 100  
+
+bootstrap_error <- bootstrapped_loo(x, y, optimal_bandwidth, n_bootstrap)
+
+print(paste("Bootstrap Estimated Prediction Error:", bootstrap_error))
+
+```
+
+#d
+```{r}
+estimator_632 =  0.368 * training_error + 0.632 * bootstrap_error
+estimator_632
+training_error
+bootstrap_error
+
+```
+
+We can tell that the .632 estimator is living between training_error and bootstrap_error
+
+#e
+
+```{r}
+testing_data = aids %>% 
+  filter(!(person %in% randint))
+unique_person = unique(testing_data$person)
+
+mean_errors = numeric(1000)
+compute_mean_error <- function(x_test, y_test, bandwidth) {
+  smoothed_values <- smoother$y[match(x_test, unique(x_test))]
+  mean_squared_error <- mean((y_test - smoothed_values)^2)
+  return(mean_squared_error)
+}
+smoother = ksmooth(x,y, kernel = "normal", bandwidth = optimal_bandwidth, x.points = unique(x))
+for (i in 1:1000) {
+  randint = sample(unique_person,5)
+  testing = testing_data %>% 
+  filter(person %in% randint)
+  x_test_sample <- testing$time
+  y_test_sample <- testing$cd4
+  mean_errors[i] <- compute_mean_error(x_test_sample, y_test_sample, optimal_bandwidth)
+}
+
+average_mean_squared_error = mean(mean_errors)
+average_mean_squared_error
+```
+
+
+The prediction error is a bit higher than the training error but acceptable.
+
+
+
+
+
+
+
+
+

@@ -25,3 +25,4 @@ dataset/
 *.png
 *.jpeg
 *.heic
+DATA6700/app/model_rf_all.pkl
